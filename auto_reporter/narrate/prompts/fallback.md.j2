@@ -1,0 +1,34 @@
+{% set es = language == "es" %}
+# {{ "Reporte semanal" if es else "Weekly report" }} — {{ audience }}
+
+{{ "Periodo" if es else "Period" }}: {{ digest.window_start.date() }} → {{ digest.window_end.date() }}
+{% if digest.data_gaps %}
+
+## ⚠ {{ "Datos incompletos" if es else "Partial data" }}
+{% for gap in digest.data_gaps %}
+- {{ gap }}
+{% endfor %}
+{% endif %}
+
+## {{ "Actividad" if es else "Activity" }}
+- Commits: {{ digest.total_commits }}
+- PRs {{ "abiertos" if es else "opened" }}: {{ digest.total_prs_opened }} · {{ "mergeados" if es else "merged" }}: {{ digest.total_prs_merged }}
+
+## {{ "Completado" if es else "Completed" }}
+{% for t in digest.tickets_done %}
+- [{{ t.key }}]({{ t.url }}) — {{ t.summary }} ({{ t.commit_count }} commits)
+{% else %}
+- {{ "Nada completado esta semana" if es else "Nothing completed this week" }}
+{% endfor %}
+
+## {{ "En curso" if es else "In progress" }}
+{% for t in digest.tickets_in_progress %}
+- [{{ t.key }}]({{ t.url }}) — {{ t.summary }} ({{ t.status }})
+{% endfor %}
+
+## {{ "Bloqueos" if es else "Blockers" }}
+{% for b in digest.blockers %}
+- **{{ b.kind }}**: [{{ b.ticket_key }}]({{ b.evidence_url }}) — {{ b.summary }}{% if b.days is not none %} ({{ b.days }} {{ "días" if es else "days" }}){% endif %}
+{% else %}
+- {{ "Sin bloqueos detectados" if es else "No blockers detected" }}
+{% endfor %}
