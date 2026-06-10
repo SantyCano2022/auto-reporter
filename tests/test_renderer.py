@@ -61,3 +61,10 @@ def test_fallback_renders_each_blocker_on_its_own_line():
     text = render_fallback(DIGEST, "technical", "es")
     blocker_lines = [line for line in text.splitlines() if line.startswith("- **")]
     assert len(blocker_lines) == len(DIGEST.blockers)
+
+
+def test_fallback_pluralizes_commit_counts():
+    text = render_fallback(DIGEST, "technical", "es")
+    assert "(1 commit)" in text
+    assert "(1 commits)" not in text
+    assert "(2 commits)" in text

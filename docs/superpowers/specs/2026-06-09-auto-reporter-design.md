@@ -98,7 +98,7 @@ auto_reporter/
 ### Key behaviors
 
 - **Collection window:** `[state.last_successful_run, now]`; fallback to last 7 days
-  if `state.json` is missing. `--window 7d` override for manual runs.
+  if `state.json` is missing. `--window-days 7` override for manual runs.
 - **Correlation:** extract ticket keys (`[A-Z][A-Z0-9]+-\d+`, filtered to the
   configured Jira project key) from branch names, commit messages, and PR titles.
   Produces ticket↔commits/PRs links used by stats and blockers.

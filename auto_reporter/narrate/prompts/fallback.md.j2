@@ -16,7 +16,7 @@
 
 ## {{ "Completado" if es else "Completed" }}
 {% for t in digest.tickets_done %}
-- [{{ t.key }}]({{ t.url }}) — {{ t.summary }} ({{ t.commit_count }} commits)
+- [{{ t.key }}]({{ t.url }}) — {{ t.summary }} ({{ t.commit_count }} commit{{ "s" if t.commit_count != 1 else "" }})
 {% else %}
 - {{ "Nada completado esta semana" if es else "Nothing completed this week" }}
 {% endfor %}
