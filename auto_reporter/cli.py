@@ -49,19 +49,22 @@ def _collect(cfg: Config, secrets: Secrets, start: datetime, now: datetime,
              demo: bool) -> tuple[Snapshot, list[str]]:
     if demo:
         return synthetic_snapshot(now=now), []
+    # Resolve credentials BEFORE the try blocks: typer.Exit subclasses Exception,
+    # so a missing secret inside them would be swallowed into a "data gap" and the
+    # config error (exit 2) would never surface.
+    github_token = _require(secrets.github_token, "GITHUB_TOKEN")
+    jira_email = _require(secrets.jira_email, "JIRA_EMAIL")
+    jira_api_token = _require(secrets.jira_api_token, "JIRA_API_TOKEN")
     gaps: list[str] = []
     commits, prs = [], []
     tickets = []
     try:
-        commits, prs = collect_github(
-            cfg.github.repo, _require(secrets.github_token, "GITHUB_TOKEN"), start, now)
+        commits, prs = collect_github(cfg.github.repo, github_token, start, now)
     except Exception as exc:  # noqa: BLE001 — degrade, surface in report, exit non-zero
         gaps.append(f"github: collection failed ({type(exc).__name__})")
     try:
-        tickets = collect_jira(
-            cfg.jira.base_url, _require(secrets.jira_email, "JIRA_EMAIL"),
-            _require(secrets.jira_api_token, "JIRA_API_TOKEN"),
-            cfg.jira.project_key, start)
+        tickets = collect_jira(cfg.jira.base_url, jira_email, jira_api_token,
+                               cfg.jira.project_key, start)
     except Exception as exc:  # noqa: BLE001
         gaps.append(f"jira: collection failed ({type(exc).__name__})")
     snapshot = Snapshot(repo=cfg.github.repo, project_key=cfg.jira.project_key,
