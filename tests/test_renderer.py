@@ -55,3 +55,9 @@ def test_narrate_retries_once_then_falls_back_flagged():
     assert "previous draft cited numbers" in llm.prompts[1]
     assert report.generator == "fallback"
     assert report.flagged is True
+
+
+def test_fallback_renders_each_blocker_on_its_own_line():
+    text = render_fallback(DIGEST, "technical", "es")
+    blocker_lines = [line for line in text.splitlines() if line.startswith("- **")]
+    assert len(blocker_lines) == len(DIGEST.blockers)

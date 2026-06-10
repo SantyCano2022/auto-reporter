@@ -28,7 +28,7 @@
 
 ## {{ "Bloqueos" if es else "Blockers" }}
 {% for b in digest.blockers %}
-- **{{ b.kind }}**: [{{ b.ticket_key }}]({{ b.evidence_url }}) — {{ b.summary }}{% if b.days is not none %} ({{ b.days }} {{ "días" if es else "days" }}){% endif %}
+- **{{ b.kind }}**: [{{ b.ticket_key }}]({{ b.evidence_url }}) — {{ b.summary }}{{ " ({} {})".format(b.days, "días" if es else "days") if b.days is not none else "" }}
 {% else %}
 - {{ "Sin bloqueos detectados" if es else "No blockers detected" }}
 {% endfor %}
