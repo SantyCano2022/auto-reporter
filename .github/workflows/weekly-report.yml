@@ -1,0 +1,41 @@
+name: weekly-report
+
+# Hard Requirement 1: NO `push` trigger — the state commit below can never
+# re-trigger this workflow structurally. `[skip ci]` in the commit message is
+# the second defense layer in case a push trigger is ever added.
+on:
+  schedule:
+    - cron: "0 16 * * 5" # Friday 16:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install .
+      - name: Generate and deliver weekly report
+        env:
+          # HR2: every credential comes from Actions Secrets; none live in the repo.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TG_CHAT_TECHNICAL: ${{ secrets.TG_CHAT_TECHNICAL }}
+          TG_CHAT_EXECUTIVE: ${{ secrets.TG_CHAT_EXECUTIVE }}
+          TG_CHAT_CLIENT: ${{ secrets.TG_CHAT_CLIENT }}
+        run: auto-reporter run
+      - name: Commit state (only reached on success)
+        run: |
+          git config user.name "auto-reporter-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state.json
+          git diff --cached --quiet || git commit -m "chore: update state [skip ci]"
+          git push

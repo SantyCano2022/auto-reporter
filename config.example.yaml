@@ -1,0 +1,17 @@
+github:
+  repo: acme/webapp
+jira:
+  base_url: https://example.atlassian.net
+  project_key: DEMO
+report:
+  language: es
+llm:
+  provider: groq
+  model: llama-3.3-70b-versatile
+thresholds:
+  stuck_days: 3
+  silent_days: 3
+audiences:
+  technical: { chat_id_env: TG_CHAT_TECHNICAL }
+  executive: { chat_id_env: TG_CHAT_EXECUTIVE }
+  client: { chat_id_env: TG_CHAT_CLIENT }

@@ -45,7 +45,7 @@ These are non-negotiable and must be verified in the implementation plan:
      (gitignored) via `python-dotenv`. Never in the repo, never in YAML config.
    - `snapshot.json` and `digest.json` persist activity data only: titles, IDs,
      public handles, timestamps, URLs. No tokens, no Jira user emails — Jira users
-     are stored as `accountId` + `displayName` only.
+     are stored as `displayName` only.
    - The Pydantic schemas for both artifacts have no free-form fields where
      credentials could leak; a unit test asserts no configured secret value
      appears in serialized artifacts.
@@ -98,7 +98,7 @@ auto_reporter/
 ### Key behaviors
 
 - **Collection window:** `[state.last_successful_run, now]`; fallback to last 7 days
-  if `state.json` is missing. `--window 7d` override for manual runs.
+  if `state.json` is missing. `--window-days 7` override for manual runs.
 - **Correlation:** extract ticket keys (`[A-Z][A-Z0-9]+-\d+`, filtered to the
   configured Jira project key) from branch names, commit messages, and PR titles.
   Produces ticket↔commits/PRs links used by stats and blockers.
@@ -109,7 +109,8 @@ auto_reporter/
 - **Narration:** prompt = digest JSON + audience style guide + report language.
   The model is instructed to cite only digest values.
 - **Anti-hallucination guard:** extract numerals from the generated narrative and
-  verify each appears in the digest (with date/version-string allowlist). On
+  verify each appears in the digest (allowlist = every numeral in the digest
+  JSON, leading-zero-normalized; deliberately broad for the MVP). On
   failure: one retry with corrective prompt, then fall back to template renderer
   and flag the report. A report with invented numbers must never ship silently.
 - **Template fallback:** Jinja2 deterministic renderer used when no LLM key is
