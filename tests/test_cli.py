@@ -90,6 +90,22 @@ def test_dry_run_does_not_advance_state(tmp_path, monkeypatch):
     assert not (tmp_path / "state.json").exists()
 
 
+def test_demo_dry_run_survives_cp1252_console(tmp_path):
+    """README claim: the demo works in 60 seconds. Windows consoles often default
+    to cp1252, which cannot encode the report's arrows/em-dashes — main() must
+    reconfigure output streams instead of crashing with UnicodeEncodeError."""
+    code = (
+        "import sys; from auto_reporter.cli import main; "
+        f"sys.argv = ['auto-reporter', 'run', '--demo', '--no-llm', '--dry-run', "
+        f"'--config', 'config.example.yaml', '--artifacts-dir', {str(tmp_path)!r}]; "
+        "main()"
+    )
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+    result = subprocess.run([sys.executable, "-c", code], cwd=REPO_ROOT,
+                            capture_output=True, env=env)
+    assert result.returncode == 0, result.stderr.decode("utf-8", "replace")
+
+
 def test_run_missing_credentials_exits_2_not_partial_report(tmp_path, monkeypatch):
     """A missing secret is a config error (exit 2), not a weekly 'data gap (Exit)'."""
     for var in ("GITHUB_TOKEN", "JIRA_EMAIL", "JIRA_API_TOKEN"):

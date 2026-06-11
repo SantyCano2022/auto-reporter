@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -27,7 +28,18 @@ ConfigOpt = typer.Option(Path("config.yaml"), "--config", help="Path to config.y
 ArtifactsOpt = typer.Option(Path("artifacts"), "--artifacts-dir")
 
 
+def _ensure_utf8_output() -> None:
+    # Windows consoles often default to cp1252, which cannot encode the report's
+    # arrows/em-dashes and would crash dry-run printing with UnicodeEncodeError.
+    for stream in (sys.stdout, sys.stderr):
+        encoding = getattr(stream, "encoding", None)
+        if (encoding and encoding.lower().replace("-", "") != "utf8"
+                and hasattr(stream, "reconfigure")):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+
 def main() -> None:
+    _ensure_utf8_output()
     load_dotenv()
     app()
 
