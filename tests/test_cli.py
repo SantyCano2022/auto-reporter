@@ -106,6 +106,28 @@ def test_demo_dry_run_survives_cp1252_console(tmp_path):
     assert result.returncode == 0, result.stderr.decode("utf-8", "replace")
 
 
+def test_analyze_anchors_now_to_window_end_not_wall_clock(tmp_path, monkeypatch):
+    """Re-running analyze on the same snapshot must yield the same digest:
+    blocker day-counts anchor to the snapshot window, not to today."""
+    r1 = runner.invoke(app, ["collect", "--demo", "--config", EXAMPLE_CONFIG,
+                             "--artifacts-dir", str(tmp_path)])
+    assert r1.exit_code == 0, r1.output
+
+    class FrozenFuture(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2030, 1, 1, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(cli_mod, "datetime", FrozenFuture)
+    r2 = runner.invoke(app, ["analyze", "--config", EXAMPLE_CONFIG,
+                             "--artifacts-dir", str(tmp_path)])
+    assert r2.exit_code == 0, r2.output
+    digest = json.loads((tmp_path / "digest.json").read_text(encoding="utf-8"))
+    stuck_days = [b["days"] for b in digest["blockers"]
+                  if b["ticket_key"] == "DEMO-104" and b["kind"] == "stuck"]
+    assert stuck_days == [5]  # 5 days at snapshot time, not ~3.5 years in 2030
+
+
 def test_run_missing_credentials_exits_2_not_partial_report(tmp_path, monkeypatch):
     """A missing secret is a config error (exit 2), not a weekly 'data gap (Exit)'."""
     for var in ("GITHUB_TOKEN", "JIRA_EMAIL", "JIRA_API_TOKEN"):

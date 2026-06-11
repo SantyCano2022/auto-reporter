@@ -166,9 +166,12 @@ def analyze(config: Path = ConfigOpt, artifacts_dir: Path = ArtifactsOpt) -> Non
     cfg = load_config(config)
     snapshot = Snapshot.model_validate_json(
         (artifacts_dir / "snapshot.json").read_text(encoding="utf-8"))
+    # Anchor "now" to the snapshot window so analyze is a pure function of its
+    # input: re-running on the same snapshot (e.g. re-narrating a past week)
+    # yields the same digest regardless of wall-clock time.
     digest = build_digest(snapshot, stuck_days=cfg.thresholds.stuck_days,
                           silent_days=cfg.thresholds.silent_days,
-                          now=datetime.now(timezone.utc),
+                          now=snapshot.window_end,
                           data_gaps=snapshot.data_gaps)
     (artifacts_dir / "digest.json").write_text(digest.model_dump_json(indent=2),
                                                encoding="utf-8")
