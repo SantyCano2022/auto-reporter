@@ -10,10 +10,16 @@ IN_PROGRESS_STATUSES = {"in progress", "in review"}
 
 
 def is_done(ticket: Ticket) -> bool:
+    # statusCategory is language-independent; status names are only a fallback
+    # for snapshots collected before the category was captured.
+    if ticket.status_category is not None:
+        return ticket.status_category == "done"
     return ticket.status.lower() in DONE_STATUSES
 
 
 def is_in_progress(ticket: Ticket) -> bool:
+    if ticket.status_category is not None:
+        return ticket.status_category == "indeterminate"
     return ticket.status.lower() in IN_PROGRESS_STATUSES
 
 

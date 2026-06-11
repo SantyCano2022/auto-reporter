@@ -35,6 +35,9 @@ class Ticket(BaseModel):
     key: str
     summary: str
     status: str
+    # Jira statusCategory key ("new"/"indeterminate"/"done") — language-independent,
+    # unlike status names ("En curso", "Listo"...). None in pre-existing snapshots.
+    status_category: str | None = None
     assignee: str | None = None  # Jira displayName only — never emails (HR2)
     url: str
     in_progress_since: datetime | None = None

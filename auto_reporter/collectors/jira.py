@@ -24,6 +24,9 @@ def collect_jira(
     for issue in data["issues"]:
         fields = issue["fields"]
         status = fields["status"]["name"]
+        # statusCategory.key is "new"/"indeterminate"/"done" regardless of the
+        # site language; status names are localized ("En curso", "Listo"...).
+        category = (fields["status"].get("statusCategory") or {}).get("key")
         assignee = (fields.get("assignee") or {}).get("displayName")  # HR2: no emails
         transitions = [
             TicketTransition(from_status=item["fromString"] or "",
@@ -33,13 +36,16 @@ def collect_jira(
             for item in history["items"]
             if item["field"] == "status"
         ]
+        in_progress = (category == "indeterminate" if category is not None
+                       else status.lower() in IN_PROGRESS_STATUSES)
         in_progress_since = None
-        if status.lower() in IN_PROGRESS_STATUSES:
+        if in_progress:
             candidates = [t.at for t in transitions if t.to_status == status]
             in_progress_since = max(candidates) if candidates else None
         tickets.append(Ticket(
             key=issue["key"], summary=fields["summary"], status=status,
-            assignee=assignee, url=f"{base_url}/browse/{issue['key']}",
+            status_category=category, assignee=assignee,
+            url=f"{base_url}/browse/{issue['key']}",
             in_progress_since=in_progress_since, transitions=transitions,
         ))
     return tickets

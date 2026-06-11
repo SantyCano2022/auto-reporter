@@ -24,9 +24,10 @@ def make_pr(number=10, title="PROJ-1 login fix", author="alice", state="merged",
 
 def make_ticket(key="PROJ-1", summary="Fix login", status="In Progress", assignee="Alice",
                 url="https://example.atlassian.net/browse/PROJ-1",
-                in_progress_since=None, transitions=()) -> Ticket:
+                in_progress_since=None, transitions=(), status_category=None) -> Ticket:
     return Ticket(key=key, summary=summary, status=status, assignee=assignee, url=url,
-                  in_progress_since=in_progress_since, transitions=list(transitions))
+                  in_progress_since=in_progress_since, transitions=list(transitions),
+                  status_category=status_category)
 
 
 def make_snapshot(commits=(), pull_requests=(), tickets=(), repo="acme/webapp",
