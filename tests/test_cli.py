@@ -72,6 +72,24 @@ def test_staged_pipeline_preserves_data_gaps(tmp_path, monkeypatch):
     assert digest["data_gaps"] == ["jira: collection failed (RuntimeError)"]
 
 
+def test_dry_run_does_not_advance_state(tmp_path, monkeypatch):
+    """A dry run delivers nothing, so it must not move last_successful_run:
+    otherwise the next real run silently skips that activity window."""
+    monkeypatch.chdir(tmp_path)  # state.json is cwd-relative
+    monkeypatch.setattr(cli_mod, "collect_github", lambda *a, **k: ([], []))
+    monkeypatch.setattr(cli_mod, "collect_jira", lambda *a, **k: [])
+    monkeypatch.setenv("GITHUB_TOKEN", "x")
+    monkeypatch.setenv("JIRA_EMAIL", "x")
+    monkeypatch.setenv("JIRA_API_TOKEN", "x")
+
+    result = runner.invoke(app, ["run", "--no-llm", "--dry-run",
+                                 "--config", EXAMPLE_CONFIG,
+                                 "--artifacts-dir", str(tmp_path / "artifacts"),
+                                 "--window-days", "7"])
+    assert result.exit_code == 0, result.output
+    assert not (tmp_path / "state.json").exists()
+
+
 def test_run_missing_credentials_exits_2_not_partial_report(tmp_path, monkeypatch):
     """A missing secret is a config error (exit 2), not a weekly 'data gap (Exit)'."""
     for var in ("GITHUB_TOKEN", "JIRA_EMAIL", "JIRA_API_TOKEN"):

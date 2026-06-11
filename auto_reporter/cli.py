@@ -127,7 +127,7 @@ def run(config: Path = ConfigOpt, artifacts_dir: Path = ArtifactsOpt,
     if gaps:
         typer.echo(f"Data gaps: {gaps} — report is partial.", err=True)
         raise typer.Exit(code=1)
-    if not demo:
+    if not demo and not dry_run:  # dry runs deliver nothing; never advance the window
         save_state(STATE_PATH, now)
 
 
