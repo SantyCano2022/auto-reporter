@@ -7,7 +7,10 @@ SECRET_ENV_VARS = ["GITHUB_TOKEN", "JIRA_EMAIL", "JIRA_API_TOKEN",
 
 
 def test_artifacts_never_contain_secret_values(monkeypatch):
-    """HR2: snapshot.json / digest.json must carry activity only, never credentials."""
+    """HR2 schema-level regression: the artifact models have no fields that could
+    echo configured secret values. (The data-path check that real collector input
+    never leaks PII lives in test_jira_collector.test_email_never_reaches_the_model.)
+    """
     for var in SECRET_ENV_VARS:
         monkeypatch.setenv(var, f"sekret-{var.lower()}")
 
