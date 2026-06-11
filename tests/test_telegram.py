@@ -40,3 +40,23 @@ def test_send_retries_without_markdown_on_400():
     assert route.call_count == 2
     import json
     assert "parse_mode" not in json.loads(route.calls[1].request.content)
+
+
+@respx.mock
+def test_send_error_never_leaks_the_token():
+    """httpx error messages embed the request URL, which contains the bot token.
+
+    A Telegram outage must not print the token into (public) CI logs.
+    """
+    respx.post(API).mock(return_value=httpx.Response(403, json={"ok": False}))
+    notifier = TelegramNotifier(token="TOKEN")
+    try:
+        notifier.send("123", "hola")
+        raised = None
+    except Exception as exc:  # noqa: BLE001 — we inspect whatever propagates
+        raised = exc
+    assert raised is not None
+    assert "TOKEN" not in str(raised)
+    assert "TOKEN" not in repr(raised)
+    # the chained original (whose message embeds the URL) must not be displayed
+    assert raised.__cause__ is None and raised.__suppress_context__

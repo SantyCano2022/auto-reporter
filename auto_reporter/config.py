@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -15,11 +15,12 @@ def load_config(path: Path) -> Config:
 
 @dataclass(frozen=True)
 class Secrets:
-    github_token: str | None
-    jira_email: str | None
-    jira_api_token: str | None
-    telegram_bot_token: str | None
-    groq_api_key: str | None
+    # repr=False on every field: reprs end up in logs and crash reports (HR2)
+    github_token: str | None = field(repr=False)
+    jira_email: str | None = field(repr=False)
+    jira_api_token: str | None = field(repr=False)
+    telegram_bot_token: str | None = field(repr=False)
+    groq_api_key: str | None = field(repr=False)
 
     @classmethod
     def from_env(cls) -> "Secrets":

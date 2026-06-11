@@ -17,3 +17,23 @@ def test_artifacts_never_contain_secret_values(monkeypatch):
 
     for var in SECRET_ENV_VARS:
         assert f"sekret-{var.lower()}" not in blob
+
+
+def test_secret_holders_have_redacted_reprs():
+    """HR2: repr/str of credential holders must never print the credential.
+
+    Reprs end up in logs, pytest assertion diffs and crash reports.
+    """
+    from auto_reporter.config import Secrets
+    from auto_reporter.deliver.telegram import TelegramNotifier
+    from auto_reporter.narrate.llm import GroqClient
+
+    secrets = Secrets(github_token="gh-sekret", jira_email="jira-mail-sekret",
+                      jira_api_token="jira-sekret", telegram_bot_token="tg-sekret",
+                      groq_api_key="groq-sekret")
+    for sentinel in ("gh-sekret", "jira-mail-sekret", "jira-sekret",
+                     "tg-sekret", "groq-sekret"):
+        assert sentinel not in repr(secrets)
+
+    assert "groq-sekret" not in repr(GroqClient(api_key="groq-sekret", model="m"))
+    assert "tg-sekret" not in repr(TelegramNotifier(token="tg-sekret"))

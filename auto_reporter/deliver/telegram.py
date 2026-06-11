@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 
@@ -32,7 +32,7 @@ def split_message(text: str, limit: int = TELEGRAM_LIMIT) -> list[str]:
 
 @dataclass(frozen=True)
 class TelegramNotifier:
-    token: str
+    token: str = field(repr=False)  # never print the credential (HR2)
 
     def send(self, chat_id: str, text: str) -> None:
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
@@ -43,7 +43,16 @@ class TelegramNotifier:
                         "chat_id": chat_id, "text": chunk, "parse_mode": "Markdown"})
                 except httpx.HTTPStatusError as exc:
                     if exc.response.status_code != 400:
-                        raise
+                        raise self._redacted(exc) from None
                     # LLM markdown that Telegram can't parse -> resend as plain text
-                    request_with_retry(client, "POST", url,
-                                       json={"chat_id": chat_id, "text": chunk})
+                    try:
+                        request_with_retry(client, "POST", url,
+                                           json={"chat_id": chat_id, "text": chunk})
+                    except httpx.HTTPStatusError as exc2:
+                        raise self._redacted(exc2) from None
+
+    def _redacted(self, exc: httpx.HTTPStatusError) -> RuntimeError:
+        # httpx embeds the full request URL (which contains the bot token) in its
+        # error message; that must never reach (public) CI logs. `from None` above
+        # also severs the chained original exception carrying the URL.
+        return RuntimeError(str(exc).replace(self.token, "***"))

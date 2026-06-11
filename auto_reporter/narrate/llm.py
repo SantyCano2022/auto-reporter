@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 import httpx
@@ -16,7 +16,7 @@ class LLMClient(Protocol):
 
 @dataclass(frozen=True)
 class GroqClient:
-    api_key: str
+    api_key: str = field(repr=False)  # never print the credential (HR2)
     model: str
 
     def complete(self, prompt: str) -> str:
