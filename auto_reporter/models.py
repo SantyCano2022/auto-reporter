@@ -49,6 +49,7 @@ class Snapshot(BaseModel):
     commits: list[Commit] = []
     pull_requests: list[PullRequest] = []
     tickets: list[Ticket] = []
+    data_gaps: list[str] = []  # sources that failed during collection — snapshot is partial
 
 
 class TicketActivity(BaseModel):

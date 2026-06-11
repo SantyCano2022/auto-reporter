@@ -69,7 +69,7 @@ def _collect(cfg: Config, secrets: Secrets, start: datetime, now: datetime,
         gaps.append(f"jira: collection failed ({type(exc).__name__})")
     snapshot = Snapshot(repo=cfg.github.repo, project_key=cfg.jira.project_key,
                         window_start=start, window_end=now, commits=commits,
-                        pull_requests=prs, tickets=tickets)
+                        pull_requests=prs, tickets=tickets, data_gaps=gaps)
     return snapshot, gaps
 
 
@@ -156,7 +156,8 @@ def analyze(config: Path = ConfigOpt, artifacts_dir: Path = ArtifactsOpt) -> Non
         (artifacts_dir / "snapshot.json").read_text(encoding="utf-8"))
     digest = build_digest(snapshot, stuck_days=cfg.thresholds.stuck_days,
                           silent_days=cfg.thresholds.silent_days,
-                          now=datetime.now(timezone.utc))
+                          now=datetime.now(timezone.utc),
+                          data_gaps=snapshot.data_gaps)
     (artifacts_dir / "digest.json").write_text(digest.model_dump_json(indent=2),
                                                encoding="utf-8")
 

@@ -48,6 +48,30 @@ def test_run_with_partial_source_failure_delivers_but_exits_nonzero(tmp_path, mo
     assert "jira" in report.lower()  # data gap surfaced in the report
 
 
+def test_staged_pipeline_preserves_data_gaps(tmp_path, monkeypatch):
+    """collect -> analyze must not launder a partial snapshot into a complete digest."""
+    def boom(*args, **kwargs):
+        raise RuntimeError("jira down")
+
+    monkeypatch.setattr(cli_mod, "collect_jira", boom)
+    monkeypatch.setattr(cli_mod, "collect_github", lambda *a, **k: ([], []))
+    monkeypatch.setenv("GITHUB_TOKEN", "x")
+    monkeypatch.setenv("JIRA_EMAIL", "x")
+    monkeypatch.setenv("JIRA_API_TOKEN", "x")
+
+    r1 = runner.invoke(app, ["collect", "--config", EXAMPLE_CONFIG,
+                             "--artifacts-dir", str(tmp_path), "--window-days", "7"])
+    assert r1.exit_code == 1
+    snap = json.loads((tmp_path / "snapshot.json").read_text(encoding="utf-8"))
+    assert snap["data_gaps"] == ["jira: collection failed (RuntimeError)"]
+
+    r2 = runner.invoke(app, ["analyze", "--config", EXAMPLE_CONFIG,
+                             "--artifacts-dir", str(tmp_path)])
+    assert r2.exit_code == 0, r2.output
+    digest = json.loads((tmp_path / "digest.json").read_text(encoding="utf-8"))
+    assert digest["data_gaps"] == ["jira: collection failed (RuntimeError)"]
+
+
 def test_run_missing_credentials_exits_2_not_partial_report(tmp_path, monkeypatch):
     """A missing secret is a config error (exit 2), not a weekly 'data gap (Exit)'."""
     for var in ("GITHUB_TOKEN", "JIRA_EMAIL", "JIRA_API_TOKEN"):
