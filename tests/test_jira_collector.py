@@ -32,10 +32,16 @@ SEARCH_PAYLOAD = {
 }
 
 
+def _mock_jira(search_payload, timezone="Etc/UTC"):
+    respx.get("https://example.atlassian.net/rest/api/2/myself").mock(
+        return_value=httpx.Response(200, json={"timeZone": timezone}))
+    return respx.get("https://example.atlassian.net/rest/api/3/search/jql").mock(
+        return_value=httpx.Response(200, json=search_payload))
+
+
 @respx.mock
 def test_collect_jira_maps_tickets():
-    respx.get("https://example.atlassian.net/rest/api/3/search/jql").mock(
-        return_value=httpx.Response(200, json=SEARCH_PAYLOAD))
+    _mock_jira(SEARCH_PAYLOAD)
 
     tickets = collect_jira("https://example.atlassian.net", "me@x.com", "tok",
                            "DEMO", WEEK_AGO)
@@ -76,8 +82,7 @@ SPANISH_PAYLOAD = {
 
 @respx.mock
 def test_collect_jira_uses_status_category_on_non_english_sites():
-    respx.get("https://example.atlassian.net/rest/api/3/search/jql").mock(
-        return_value=httpx.Response(200, json=SPANISH_PAYLOAD))
+    _mock_jira(SPANISH_PAYLOAD)
 
     (ticket,) = collect_jira("https://example.atlassian.net", "me@x.com", "tok",
                              "SCRUM", WEEK_AGO)
@@ -89,9 +94,22 @@ def test_collect_jira_uses_status_category_on_non_english_sites():
 
 
 @respx.mock
+def test_jql_window_converted_to_profile_timezone():
+    # Jira evaluates naive JQL datetimes in the API user's profile timezone,
+    # not UTC: sending the UTC wall-clock to a UTC-5 profile shifts the window
+    # 5h late and silently drops recently-updated tickets.
+    search = _mock_jira(SEARCH_PAYLOAD, timezone="America/Bogota")
+
+    collect_jira("https://example.atlassian.net", "me@x.com", "tok",
+                 "DEMO", WEEK_AGO)  # 2026-05-29 16:00 UTC
+
+    jql = search.calls.last.request.url.params["jql"]
+    assert 'updated >= "2026-05-29 11:00"' in jql  # 16:00 UTC == 11:00 Bogota
+
+
+@respx.mock
 def test_email_never_reaches_the_model():
-    respx.get("https://example.atlassian.net/rest/api/3/search/jql").mock(
-        return_value=httpx.Response(200, json=SEARCH_PAYLOAD))
+    _mock_jira(SEARCH_PAYLOAD)
     tickets = collect_jira("https://example.atlassian.net", "me@x.com", "tok",
                            "DEMO", WEEK_AGO)
     assert "alice@corp.com" not in tickets[0].model_dump_json()

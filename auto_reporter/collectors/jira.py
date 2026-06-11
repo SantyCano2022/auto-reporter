@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -12,8 +13,12 @@ from auto_reporter.models import Ticket, TicketTransition
 def collect_jira(
     base_url: str, email: str, api_token: str, project_key: str, window_start: datetime
 ) -> list[Ticket]:
-    jql = f'project = {project_key} AND updated >= "{window_start:%Y-%m-%d %H:%M}"'
     with httpx.Client(auth=(email, api_token), timeout=30) as client:
+        # Naive JQL datetimes are evaluated in the API user's profile timezone,
+        # so the UTC window must be converted or it shifts by the UTC offset.
+        profile = request_with_retry(client, "GET", f"{base_url}/rest/api/2/myself").json()
+        local_start = window_start.astimezone(ZoneInfo(profile.get("timeZone") or "UTC"))
+        jql = f'project = {project_key} AND updated >= "{local_start:%Y-%m-%d %H:%M}"'
         data = request_with_retry(
             client, "GET", f"{base_url}/rest/api/3/search/jql",
             params={"jql": jql, "fields": "summary,status,assignee",
