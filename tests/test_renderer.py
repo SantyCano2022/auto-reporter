@@ -68,3 +68,26 @@ def test_fallback_pluralizes_commit_counts():
     assert "(1 commit)" in text
     assert "(1 commits)" not in text
     assert "(2 commits)" in text
+
+
+def test_narrate_llm_http_failure_falls_back_flagged():
+    """A Groq outage or bad key must degrade to the template, not kill the run."""
+    import httpx
+
+    class ExplodingLLM:
+        def complete(self, prompt: str) -> str:
+            raise httpx.ConnectError("groq down")
+
+    report = narrate(DIGEST, "executive", "es", llm=ExplodingLLM())
+    assert report.generator == "fallback"
+    assert report.flagged is True
+
+
+def test_narrate_llm_malformed_response_falls_back_flagged():
+    class MalformedLLM:
+        def complete(self, prompt: str) -> str:
+            raise KeyError("choices")  # what GroqClient raises on schema drift
+
+    report = narrate(DIGEST, "client", "en", llm=MalformedLLM())
+    assert report.generator == "fallback"
+    assert report.flagged is True

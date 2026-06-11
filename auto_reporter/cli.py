@@ -100,8 +100,8 @@ def _narrate_and_deliver(cfg: Config, digest: Digest, artifacts_dir: Path,
         report = narrate_report(digest, audience, cfg.report.language, llm)
         (artifacts_dir / f"report_{audience}.md").write_text(report.text, encoding="utf-8")
         if report.flagged:
-            typer.echo(f"[guard] {audience}: invented numbers twice; used fallback.",
-                       err=True)
+            typer.echo(f"[fallback] {audience}: LLM output rejected or unavailable; "
+                       "deterministic template used.", err=True)
         if notifier is None:
             typer.echo(f"\n===== {audience} =====\n{report.text}")
         else:
