@@ -60,3 +60,23 @@ def test_send_error_never_leaks_the_token():
     assert "TOKEN" not in repr(raised)
     # the chained original (whose message embeds the URL) must not be displayed
     assert raised.__cause__ is None and raised.__suppress_context__
+
+
+@respx.mock
+def test_send_5xx_after_retries_raises_redacted_token(monkeypatch):
+    """A 5xx is retried by request_with_retry, so it reaches the redaction path
+    differently than a 4xx: only after attempts are exhausted. The token must
+    still be scrubbed from whatever propagates into (public) CI logs."""
+    monkeypatch.setattr("auto_reporter.http.time.sleep", lambda _: None)
+    route = respx.post(API).mock(return_value=httpx.Response(503, json={"ok": False}))
+    notifier = TelegramNotifier(token="TOKEN")
+    try:
+        notifier.send("123", "hola")
+        raised = None
+    except Exception as exc:  # noqa: BLE001 — we inspect whatever propagates
+        raised = exc
+    assert raised is not None
+    assert route.call_count == 3  # retried to exhaustion, not a single shot
+    assert "TOKEN" not in str(raised)
+    assert "TOKEN" not in repr(raised)
+    assert raised.__cause__ is None and raised.__suppress_context__

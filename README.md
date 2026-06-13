@@ -93,8 +93,10 @@ Periodo: 2026-06-04 → 2026-06-11
   planned (see issues).
 - **Single API page:** collectors fetch up to 100 commits/PRs/tickets per run;
   busier weeks are silently truncated for now.
-- **Status names are hardcoded** (`Done/Closed/Resolved`, `In Progress/In Review`);
-  custom Jira workflows need a code tweak.
+- **Status mapping relies on Jira's `statusCategory`** (To Do / In Progress /
+  Done) rather than status names, so non-English sites and renamed statuses
+  work out of the box; a custom status filed under an unexpected category is
+  the only case that still needs a tweak.
 - Single team / single repo / single Jira project per config.
 
 ## Dogfooding (planned)
