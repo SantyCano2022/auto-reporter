@@ -34,7 +34,7 @@ def test_run_with_partial_source_failure_delivers_but_exits_nonzero(tmp_path, mo
         raise RuntimeError("jira down")
 
     monkeypatch.setattr(cli_mod, "collect_jira", boom)
-    monkeypatch.setattr(cli_mod, "collect_github", lambda *a, **k: ([], []))
+    monkeypatch.setattr(cli_mod, "collect_github", lambda *a, **k: ([], [], []))
     monkeypatch.setenv("GITHUB_TOKEN", "x")
     monkeypatch.setenv("JIRA_EMAIL", "x")
     monkeypatch.setenv("JIRA_API_TOKEN", "x")
@@ -54,7 +54,7 @@ def test_staged_pipeline_preserves_data_gaps(tmp_path, monkeypatch):
         raise RuntimeError("jira down")
 
     monkeypatch.setattr(cli_mod, "collect_jira", boom)
-    monkeypatch.setattr(cli_mod, "collect_github", lambda *a, **k: ([], []))
+    monkeypatch.setattr(cli_mod, "collect_github", lambda *a, **k: ([], [], []))
     monkeypatch.setenv("GITHUB_TOKEN", "x")
     monkeypatch.setenv("JIRA_EMAIL", "x")
     monkeypatch.setenv("JIRA_API_TOKEN", "x")
@@ -76,8 +76,8 @@ def test_dry_run_does_not_advance_state(tmp_path, monkeypatch):
     """A dry run delivers nothing, so it must not move last_successful_run:
     otherwise the next real run silently skips that activity window."""
     monkeypatch.chdir(tmp_path)  # state.json is cwd-relative
-    monkeypatch.setattr(cli_mod, "collect_github", lambda *a, **k: ([], []))
-    monkeypatch.setattr(cli_mod, "collect_jira", lambda *a, **k: [])
+    monkeypatch.setattr(cli_mod, "collect_github", lambda *a, **k: ([], [], []))
+    monkeypatch.setattr(cli_mod, "collect_jira", lambda *a, **k: ([], []))
     monkeypatch.setenv("GITHUB_TOKEN", "x")
     monkeypatch.setenv("JIRA_EMAIL", "x")
     monkeypatch.setenv("JIRA_API_TOKEN", "x")

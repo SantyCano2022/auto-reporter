@@ -43,10 +43,11 @@ def _mock_jira(search_payload, timezone="Etc/UTC"):
 def test_collect_jira_maps_tickets():
     _mock_jira(SEARCH_PAYLOAD)
 
-    tickets = collect_jira("https://example.atlassian.net", "me@x.com", "tok",
-                           "DEMO", WEEK_AGO)
+    tickets, gaps = collect_jira("https://example.atlassian.net", "me@x.com", "tok",
+                                 "DEMO", WEEK_AGO)
 
     t1, t2 = tickets
+    assert gaps == []  # 2 issues < page size -> no truncation flag
     assert t1.key == "DEMO-1"
     assert t1.status == "In Progress"
     assert t1.assignee == "Alice"  # displayName only, never the email (HR2)
@@ -84,8 +85,9 @@ SPANISH_PAYLOAD = {
 def test_collect_jira_uses_status_category_on_non_english_sites():
     _mock_jira(SPANISH_PAYLOAD)
 
-    (ticket,) = collect_jira("https://example.atlassian.net", "me@x.com", "tok",
-                             "SCRUM", WEEK_AGO)
+    tickets, _ = collect_jira("https://example.atlassian.net", "me@x.com", "tok",
+                              "SCRUM", WEEK_AGO)
+    (ticket,) = tickets
 
     assert ticket.status == "En curso"
     assert ticket.status_category == "indeterminate"
@@ -108,8 +110,23 @@ def test_jql_window_converted_to_profile_timezone():
 
 
 @respx.mock
+def test_collect_jira_flags_gap_when_issue_page_is_full():
+    """A full issue page means the project may hold more than one page; flag it
+    so the report is marked partial instead of silently undercounting (issue #3)."""
+    issue = SEARCH_PAYLOAD["issues"][1]  # simple Done issue, empty changelog
+    full_page = {"issues": [issue | {"key": f"DEMO-{i}"} for i in range(100)]}
+    _mock_jira(full_page)
+
+    tickets, gaps = collect_jira("https://example.atlassian.net", "me@x.com", "tok",
+                                 "DEMO", WEEK_AGO)
+
+    assert len(tickets) == 100
+    assert any("jira" in g and "page" in g for g in gaps)
+
+
+@respx.mock
 def test_email_never_reaches_the_model():
     _mock_jira(SEARCH_PAYLOAD)
-    tickets = collect_jira("https://example.atlassian.net", "me@x.com", "tok",
-                           "DEMO", WEEK_AGO)
+    tickets, _ = collect_jira("https://example.atlassian.net", "me@x.com", "tok",
+                              "DEMO", WEEK_AGO)
     assert "alice@corp.com" not in tickets[0].model_dump_json()

@@ -9,10 +9,12 @@ from auto_reporter.analysis.stats import IN_PROGRESS_STATUSES
 from auto_reporter.http import request_with_retry
 from auto_reporter.models import Ticket, TicketTransition
 
+PAGE_SIZE = 100  # a full page means the project may hold more issues than we read
+
 
 def collect_jira(
     base_url: str, email: str, api_token: str, project_key: str, window_start: datetime
-) -> list[Ticket]:
+) -> tuple[list[Ticket], list[str]]:
     with httpx.Client(auth=(email, api_token), timeout=30) as client:
         # Naive JQL datetimes are evaluated in the API user's profile timezone,
         # so the UTC window must be converted or it shifts by the UTC offset.
@@ -22,7 +24,7 @@ def collect_jira(
         data = request_with_retry(
             client, "GET", f"{base_url}/rest/api/3/search/jql",
             params={"jql": jql, "fields": "summary,status,assignee",
-                    "expand": "changelog", "maxResults": 100},
+                    "expand": "changelog", "maxResults": PAGE_SIZE},
         ).json()
 
     tickets: list[Ticket] = []
@@ -53,7 +55,12 @@ def collect_jira(
             url=f"{base_url}/browse/{issue['key']}",
             in_progress_since=in_progress_since, transitions=transitions,
         ))
-    return tickets
+    # Single-page collector: a full page may hide further issues. Real
+    # pagination (nextPageToken) is deferred — see issue #3.
+    gaps: list[str] = []
+    if len(data["issues"]) == PAGE_SIZE:
+        gaps.append(f"jira: issues page full ({PAGE_SIZE}) — counts may be truncated")
+    return tickets, gaps
 
 
 def _jira_dt(value: str) -> datetime:

@@ -71,12 +71,14 @@ def _collect(cfg: Config, secrets: Secrets, start: datetime, now: datetime,
     commits, prs = [], []
     tickets = []
     try:
-        commits, prs = collect_github(cfg.github.repo, github_token, start, now)
+        commits, prs, gh_gaps = collect_github(cfg.github.repo, github_token, start, now)
+        gaps.extend(gh_gaps)  # e.g. a full page that may have truncated counts
     except Exception as exc:  # noqa: BLE001 — degrade, surface in report, exit non-zero
         gaps.append(f"github: collection failed ({type(exc).__name__})")
     try:
-        tickets = collect_jira(cfg.jira.base_url, jira_email, jira_api_token,
-                               cfg.jira.project_key, start)
+        tickets, jira_gaps = collect_jira(cfg.jira.base_url, jira_email, jira_api_token,
+                                          cfg.jira.project_key, start)
+        gaps.extend(jira_gaps)
     except Exception as exc:  # noqa: BLE001
         gaps.append(f"jira: collection failed ({type(exc).__name__})")
     snapshot = Snapshot(repo=cfg.github.repo, project_key=cfg.jira.project_key,
