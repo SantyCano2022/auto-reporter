@@ -39,3 +39,18 @@ jobs:
           git add state.json
           git diff --cached --quiet || git commit -m "chore: update state [skip ci]"
           git push
+      - name: Alert technical chat on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT_TECHNICAL: ${{ secrets.TG_CHAT_TECHNICAL }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        # Plain curl, independent of the Python app, so the alert fires even when
+        # the failure was inside auto-reporter. GitHub masks the bot token in logs.
+        run: |
+          curl -sS --fail-with-body \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT_TECHNICAL}" \
+            --data-urlencode "text=⚠️ Auto-Reporter: el reporte semanal de ${REPO} FALLÓ. Revisa el run: ${RUN_URL}" \
+            -w 'telegram_http=%{http_code}\n'
