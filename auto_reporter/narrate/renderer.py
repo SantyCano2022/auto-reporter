@@ -6,7 +6,7 @@ import httpx
 from jinja2 import Environment, PackageLoader
 
 from auto_reporter.models import Digest, Report
-from auto_reporter.narrate.guard import find_invented_numbers
+from auto_reporter.narrate.guard import find_invented_numbers, strip_unbacked_links
 from auto_reporter.narrate.llm import LLMClient
 
 _env = Environment(loader=PackageLoader("auto_reporter.narrate", "prompts"),
@@ -71,12 +71,14 @@ def narrate(digest: Digest, audience: str, language: str, llm: LLMClient | None)
     prompt = build_prompt(digest, audience, language)
     text = _complete_or_none(llm, prompt)
     if text is not None and not find_invented_numbers(text, digest):
-        return Report(audience=audience, text=text, generator="llm", flagged=False)
+        return Report(audience=audience, text=strip_unbacked_links(text, digest),
+                      generator="llm", flagged=False)
 
     if text is not None:  # invented numbers -> one corrective retry (skip if LLM is down)
         text = _complete_or_none(llm, prompt + _CORRECTIVE)
         if text is not None and not find_invented_numbers(text, digest):
-            return Report(audience=audience, text=text, generator="llm", flagged=False)
+            return Report(audience=audience, text=strip_unbacked_links(text, digest),
+                          generator="llm", flagged=False)
 
     return Report(audience=audience, text=render_fallback(digest, audience, language),
                   generator="fallback", flagged=True)

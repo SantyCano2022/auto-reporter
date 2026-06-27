@@ -1,6 +1,6 @@
 from auto_reporter.analysis import build_digest
 from auto_reporter.collectors.synthetic import synthetic_snapshot
-from auto_reporter.narrate.guard import find_invented_numbers
+from auto_reporter.narrate.guard import find_invented_numbers, strip_unbacked_links
 from tests.factories import NOW
 
 DIGEST = build_digest(synthetic_snapshot(seed=42, now=NOW),
@@ -25,3 +25,15 @@ def test_accepts_date_components_despite_leading_zeros():
 def test_accepts_ticket_numbers_from_keys():
     text = "DEMO-104 sigue en curso."
     assert find_invented_numbers(text, DIGEST) == []
+
+
+def test_strip_keeps_links_whose_target_is_in_the_digest():
+    url = "https://example.atlassian.net/browse/DEMO-104"  # a real ticket url
+    text = f"[DEMO-104]({url}) sigue en curso."
+    assert strip_unbacked_links(text, DIGEST) == text
+
+
+def test_strip_unlinks_invented_targets_keeping_the_visible_text():
+    # a commit count linked to the repo root — that URL is not in the digest
+    text = "[47](https://github.com/acme/webapp) commits esta semana."
+    assert strip_unbacked_links(text, DIGEST) == "47 commits esta semana."

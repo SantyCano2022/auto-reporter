@@ -68,6 +68,20 @@ def test_narrate_happy_path_uses_llm():
     assert report.flagged is False
 
 
+def test_narrate_strips_invented_link_targets_but_keeps_backed_ones():
+    """The number guard proves the digits; this proves the link targets. A
+    correct count linked to a made-up URL is unlinked; a real evidence URL
+    from the digest survives."""
+    url_ok = "https://example.atlassian.net/browse/DEMO-104"
+    reply = (f"{DIGEST.total_commits} commits, ver [DEMO-104]({url_ok}); "
+             f"[total](https://github.com/acme/webapp).")
+    report = narrate(DIGEST, "technical", "es", llm=FakeLLM([reply]))
+    assert report.generator == "llm"
+    assert f"[DEMO-104]({url_ok})" in report.text   # backed -> kept
+    assert "[total]" not in report.text             # invented target -> unlinked
+    assert "total." in report.text                  # visible text preserved
+
+
 def test_narrate_retries_once_then_falls_back_flagged():
     llm = FakeLLM(["we did 9999 commits", "still 8888 commits"])
     report = narrate(DIGEST, "executive", "es", llm=llm)
