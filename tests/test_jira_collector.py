@@ -1,8 +1,16 @@
 import httpx
 import respx
 
-from auto_reporter.collectors.jira import collect_jira
+from auto_reporter.collectors.jira import _jira_dt, collect_jira
 from tests.factories import WEEK_AGO
+
+
+def test_jira_dt_parses_offset_variants():
+    # Jira sends no-colon offsets ("+0000"); Python 3.12 fromisoformat handles
+    # those, colonized offsets and "Z" natively — no preprocessing needed.
+    assert _jira_dt("2026-06-01T08:00:00.000+0000").utcoffset().total_seconds() == 0
+    assert _jira_dt("2026-06-01T08:00:00.000+00:00").utcoffset().total_seconds() == 0
+    assert _jira_dt("2026-06-01T08:00:00.000-0500").utcoffset().total_seconds() == -5 * 3600
 
 SEARCH_PAYLOAD = {
     "issues": [

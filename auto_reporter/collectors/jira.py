@@ -64,7 +64,6 @@ def collect_jira(
 
 
 def _jira_dt(value: str) -> datetime:
-    # Jira format: 2026-06-01T08:00:00.000+0000 -> needs colon in offset for fromisoformat
-    if value.endswith(("+0000", "-0000")) or (len(value) > 5 and value[-5] in "+-"):
-        value = value[:-2] + ":" + value[-2:]
+    # Python 3.12 fromisoformat parses Jira's no-colon offsets ("+0000") and "Z"
+    # natively (the project requires >=3.12), so no preprocessing is needed.
     return datetime.fromisoformat(value)

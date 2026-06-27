@@ -37,8 +37,19 @@ jobs:
           git config user.name "auto-reporter-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add state.json
-          git diff --cached --quiet || git commit -m "chore: update state [skip ci]"
-          git push
+          if git diff --cached --quiet; then
+            echo "state unchanged — nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore: update state [skip ci]"
+          # main may have advanced mid-run (e.g. a manual push); rebase + retry so
+          # a delivered report is never marked failed by a lost push race.
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push && exit 0
+            echo "push attempt $attempt failed; retrying"
+            sleep $((attempt * 5))
+          done
+          exit 1
       - name: Alert technical chat on failure
         if: failure()
         env:
