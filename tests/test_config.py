@@ -1,8 +1,31 @@
 from pathlib import Path
 
+import pytest
+import yaml
+from pydantic import ValidationError
+
 from auto_reporter.config import Secrets, load_config
+from auto_reporter.models import Config, ThresholdsConfig
 
 EXAMPLE = Path("config.example.yaml")
+
+
+def test_thresholds_reject_unknown_keys():
+    # a YAML typo ("treshold:") used to fall back to defaults silently
+    with pytest.raises(ValidationError):
+        ThresholdsConfig(stuck_days=3, silent_days=3, treshold=5)
+
+
+def test_thresholds_must_be_positive():
+    with pytest.raises(ValidationError):
+        ThresholdsConfig(stuck_days=0)
+
+
+def test_config_requires_at_least_one_audience():
+    data = yaml.safe_load(EXAMPLE.read_text(encoding="utf-8"))
+    data["audiences"] = {}
+    with pytest.raises(ValidationError):
+        Config.model_validate(data)
 
 
 def test_load_example_config():

@@ -13,10 +13,17 @@ def make_commit(sha="abc123", message="PROJ-1 fix login", author="alice",
                   timestamp=timestamp or NOW - DAY)
 
 
+_UNSET = object()
+
+
 def make_pr(number=10, title="PROJ-1 login fix", author="alice", state="merged",
             head_branch="fix/proj-1-login",
             url="https://github.com/acme/webapp/pull/10",
-            created_at=None, merged_at=None) -> PullRequest:
+            created_at=None, merged_at=_UNSET) -> PullRequest:
+    # default to a state-consistent merged_at so make_pr() is valid out of the box;
+    # an explicit merged_at (incl. None) is passed through to exercise the validator.
+    if merged_at is _UNSET:
+        merged_at = NOW - DAY if state == "merged" else None
     return PullRequest(number=number, title=title, author=author, state=state,
                        head_branch=head_branch, url=url,
                        created_at=created_at or NOW - 2 * DAY, merged_at=merged_at)
