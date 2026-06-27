@@ -1,5 +1,7 @@
 # Auto-Reporter
 
+[![CI](https://github.com/SantyCano2022/auto-reporter/actions/workflows/ci.yml/badge.svg)](https://github.com/SantyCano2022/auto-reporter/actions/workflows/ci.yml)
+
 Weekly engineering progress reports, written for three audiences at once.
 
 Every Friday, Auto-Reporter collects the week's activity from a GitHub repository
@@ -7,6 +9,13 @@ and a Jira project, computes the statistics deterministically in Python, and has
 an LLM narrate them as three different reports — technical, executive, and
 client — each delivered to its own Telegram chat. No servers: the whole pipeline
 runs inside a scheduled GitHub Actions job.
+
+## What it looks like
+
+The same week, narrated three ways and delivered to three Telegram chats — the
+numbers are identical, only the voice changes:
+
+![Three audience reports delivered to Telegram](docs/telegram-sample.png)
 
 ## The engineering claim
 
@@ -99,10 +108,13 @@ Periodo: 2026-06-04 → 2026-06-11
   the only case that still needs a tweak.
 - Single team / single repo / single Jira project per config.
 
-## Dogfooding (planned)
+## Dogfooding
 
-The goal is for this repo to report on its own development — tasks tracked in a
-free-tier Jira project, with Auto-Reporter posting its own weekly progress.
+This repo reports on its own development. The scheduled `weekly-report` workflow
+runs against this very repository and a free-tier Jira project, posting Auto-
+Reporter's own weekly progress to Telegram every Friday — the screenshot above is
+a real delivery. If a run ever fails, it pings the technical chat with a link to
+the failed job.
 
 ## Future work
 
