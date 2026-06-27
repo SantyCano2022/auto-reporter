@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import httpx
 from jinja2 import Environment, PackageLoader
 
@@ -24,10 +26,28 @@ _CORRECTIVE = ("\n\nIMPORTANT: your previous draft cited numbers that are NOT in
                "Rewrite the report using only numbers that appear in DATA.")
 
 
+def _bot_safe(name: str) -> str:
+    # "github-actions[bot]" breaks Markdown link text ([x[bot]](url)); the
+    # parenthesised form reads the same and is link-safe.
+    return f"{name[:-len('[bot]')]} (bot)" if name.endswith("[bot]") else name
+
+
+def _llm_digest_json(digest: Digest) -> str:
+    """The digest as the LLM should see it: date-only window bounds (raw ISO
+    timestamps leaked into prose) and Markdown-safe author names. The guard
+    still scores against the full-precision digest, and these are subsets of
+    its numerals, so nothing new is flagged."""
+    data = json.loads(digest.model_dump_json())
+    data["window_start"] = f"{digest.window_start:%Y-%m-%d}"
+    data["window_end"] = f"{digest.window_end:%Y-%m-%d}"
+    data["per_author"] = {_bot_safe(k): v for k, v in data["per_author"].items()}
+    return json.dumps(data, indent=2, ensure_ascii=False)
+
+
 def build_prompt(digest: Digest, audience: str, language: str) -> str:
     return _env.get_template("report.md.j2").render(
         audience=audience, style=STYLE_GUIDES.get(audience, _DEFAULT_STYLE),
-        language=language, digest_json=digest.model_dump_json(indent=2))
+        language=language, digest_json=_llm_digest_json(digest))
 
 
 def render_fallback(digest: Digest, audience: str, language: str) -> str:

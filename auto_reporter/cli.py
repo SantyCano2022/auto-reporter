@@ -5,6 +5,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import httpx
 import typer
 from dotenv import load_dotenv
 
@@ -51,6 +52,14 @@ def _require(value: str | None, name: str) -> str:
     return value
 
 
+def _gap_reason(exc: Exception) -> str:
+    # An HTTP status ("HTTP 401") tells an operator a bad token from a server
+    # outage at a glance; bare exception names ("HTTPStatusError") don't.
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"HTTP {exc.response.status_code}"
+    return type(exc).__name__
+
+
 def _window_start(window_days: int | None, now: datetime) -> datetime:
     if window_days is not None:
         return now - timedelta(days=window_days)
@@ -74,13 +83,15 @@ def _collect(cfg: Config, secrets: Secrets, start: datetime, now: datetime,
         commits, prs, gh_gaps = collect_github(cfg.github.repo, github_token, start, now)
         gaps.extend(gh_gaps)  # e.g. a full page that may have truncated counts
     except Exception as exc:  # noqa: BLE001 — degrade, surface in report, exit non-zero
-        gaps.append(f"github: collection failed ({type(exc).__name__})")
+        typer.echo(f"github collection failed: {exc!r}", err=True)  # full detail to log
+        gaps.append(f"github: collection failed ({_gap_reason(exc)})")
     try:
         tickets, jira_gaps = collect_jira(cfg.jira.base_url, jira_email, jira_api_token,
                                           cfg.jira.project_key, start)
         gaps.extend(jira_gaps)
     except Exception as exc:  # noqa: BLE001
-        gaps.append(f"jira: collection failed ({type(exc).__name__})")
+        typer.echo(f"jira collection failed: {exc!r}", err=True)
+        gaps.append(f"jira: collection failed ({_gap_reason(exc)})")
     snapshot = Snapshot(repo=cfg.github.repo, project_key=cfg.jira.project_key,
                         window_start=start, window_end=now, commits=commits,
                         pull_requests=prs, tickets=tickets, data_gaps=gaps)

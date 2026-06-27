@@ -5,6 +5,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
 from typer.testing import CliRunner
 
 import auto_reporter.cli as cli_mod
@@ -70,6 +71,27 @@ def test_staged_pipeline_preserves_data_gaps(tmp_path, monkeypatch):
     assert r2.exit_code == 0, r2.output
     digest = json.loads((tmp_path / "digest.json").read_text(encoding="utf-8"))
     assert digest["data_gaps"] == ["jira: collection failed (RuntimeError)"]
+
+
+def test_collect_http_error_records_status_code_in_data_gap(tmp_path, monkeypatch):
+    """The gap must name the HTTP status, not just 'HTTPStatusError', so an
+    operator can tell a 401 (expired token, today's incident) from a 500."""
+    def boom_401(*args, **kwargs):
+        req = httpx.Request("GET", "https://example.atlassian.net/rest/api/2/myself")
+        raise httpx.HTTPStatusError("401 Unauthorized", request=req,
+                                    response=httpx.Response(401, request=req))
+
+    monkeypatch.setattr(cli_mod, "collect_jira", boom_401)
+    monkeypatch.setattr(cli_mod, "collect_github", lambda *a, **k: ([], [], []))
+    monkeypatch.setenv("GITHUB_TOKEN", "x")
+    monkeypatch.setenv("JIRA_EMAIL", "x")
+    monkeypatch.setenv("JIRA_API_TOKEN", "x")
+
+    result = runner.invoke(app, ["collect", "--config", EXAMPLE_CONFIG,
+                                 "--artifacts-dir", str(tmp_path), "--window-days", "7"])
+    assert result.exit_code == 1
+    snap = json.loads((tmp_path / "snapshot.json").read_text(encoding="utf-8"))
+    assert snap["data_gaps"] == ["jira: collection failed (HTTP 401)"]
 
 
 def test_dry_run_does_not_advance_state(tmp_path, monkeypatch):

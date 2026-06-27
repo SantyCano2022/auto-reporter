@@ -28,6 +28,26 @@ def test_prompt_embeds_digest_and_strict_rules():
     assert "Spanish" in prompt
 
 
+def test_build_prompt_feeds_date_only_window_not_raw_timestamps():
+    """Raw ISO timestamps (with microseconds) leaked into the prose; the LLM
+    should only ever see date-only window bounds."""
+    prompt = build_prompt(DIGEST, "executive", "es")
+    assert f'"window_start": "{DIGEST.window_start:%Y-%m-%d}"' in prompt
+    assert f'"window_end": "{DIGEST.window_end:%Y-%m-%d}"' in prompt
+    assert DIGEST.window_start.isoformat() not in prompt  # no time component at all
+
+
+def test_build_prompt_makes_bot_author_markdown_safe():
+    """An author named 'github-actions[bot]' breaks Markdown link text
+    ([x[bot]](url)); the LLM should see the bracket-free, link-safe form."""
+    digest = DIGEST.model_copy(update={"per_author": {"github-actions[bot]": 1,
+                                                      "alice": 2}})
+    prompt = build_prompt(digest, "technical", "es")
+    assert "github-actions (bot)" in prompt
+    assert "github-actions[bot]" not in prompt
+    assert "alice" in prompt
+
+
 def test_fallback_is_deterministic_and_lists_blockers():
     text = render_fallback(DIGEST, "technical", "es")
     assert text == render_fallback(DIGEST, "technical", "es")
