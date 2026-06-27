@@ -30,6 +30,49 @@ def test_run_demo_no_llm_dry_run_produces_three_reports(tmp_path):
         assert "DEMO-" in report.read_text(encoding="utf-8")
 
 
+def test_run_writes_narration_meta(tmp_path):
+    """generator/flagged per audience must be persisted, not just report.text,
+    so a degraded (template-fallback) report is auditable after the run."""
+    result = runner.invoke(app, ["run", "--demo", "--no-llm", "--dry-run",
+                                 "--config", "config.example.yaml",
+                                 "--artifacts-dir", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    meta = json.loads((tmp_path / "narration_meta.json").read_text(encoding="utf-8"))
+    assert set(meta) == {"technical", "executive", "client"}
+    assert all(m["generator"] == "fallback" and m["flagged"] is False
+               for m in meta.values())
+
+
+def test_flagged_report_surfaces_github_warning_and_meta(tmp_path, monkeypatch):
+    """A guard fallback in a green Actions run is invisible today; it must
+    surface as a ::warning:: annotation and as flagged=True in the metadata."""
+    from auto_reporter.models import Report
+    monkeypatch.setattr(cli_mod, "narrate_report",
+                        lambda *a, **k: Report(audience="x", text="t",
+                                               generator="fallback", flagged=True))
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    result = runner.invoke(app, ["run", "--demo", "--no-llm", "--dry-run",
+                                 "--config", "config.example.yaml",
+                                 "--artifacts-dir", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert "::warning" in result.output
+    meta = json.loads((tmp_path / "narration_meta.json").read_text(encoding="utf-8"))
+    assert all(m["flagged"] is True for m in meta.values())
+
+
+def test_staged_narrate_writes_narration_meta(tmp_path):
+    """The staged `narrate` subcommand must persist metadata too, not only run."""
+    assert runner.invoke(app, ["collect", "--demo", "--config", EXAMPLE_CONFIG,
+                               "--artifacts-dir", str(tmp_path)]).exit_code == 0
+    assert runner.invoke(app, ["analyze", "--config", EXAMPLE_CONFIG,
+                               "--artifacts-dir", str(tmp_path)]).exit_code == 0
+    r = runner.invoke(app, ["narrate", "--no-llm", "--config", EXAMPLE_CONFIG,
+                            "--artifacts-dir", str(tmp_path)])
+    assert r.exit_code == 0, r.output
+    meta = json.loads((tmp_path / "narration_meta.json").read_text(encoding="utf-8"))
+    assert set(meta) == {"technical", "executive", "client"}
+
+
 def test_run_with_partial_source_failure_delivers_but_exits_nonzero(tmp_path, monkeypatch):
     def boom(*args, **kwargs):
         raise RuntimeError("jira down")

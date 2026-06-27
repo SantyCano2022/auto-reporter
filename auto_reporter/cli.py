@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -15,7 +16,7 @@ from auto_reporter.collectors.jira import collect_jira
 from auto_reporter.collectors.synthetic import synthetic_snapshot
 from auto_reporter.config import Secrets, load_config
 from auto_reporter.deliver.telegram import TelegramNotifier
-from auto_reporter.models import Config, Digest, Snapshot
+from auto_reporter.models import Config, Digest, Report, Snapshot
 from auto_reporter.narrate.llm import GroqClient, LLMClient
 from auto_reporter.narrate.renderer import narrate as narrate_report
 from auto_reporter.state import load_last_run, save_state
@@ -107,20 +108,41 @@ def _make_llm(no_llm: bool, secrets: Secrets, cfg: Config) -> LLMClient | None:
     return None
 
 
+def _flag_fallback(audience: str, report: Report) -> None:
+    """A guard fallback is a silent quality drop in a green run. Always note it
+    on stderr; under Actions also raise a ::warning:: annotation so it shows in
+    the run summary without opening logs."""
+    if not report.flagged:
+        return
+    typer.echo(f"[fallback] {audience}: LLM output rejected or unavailable; "
+               "deterministic template used.", err=True)
+    if os.getenv("GITHUB_ACTIONS"):
+        typer.echo(f"::warning title=Report fallback::{audience}: LLM narration "
+                   "rejected by the guard; deterministic template used.")
+
+
+def _write_narration_meta(artifacts_dir: Path, reports: dict[str, Report]) -> None:
+    meta = {a: {"generator": r.generator, "flagged": r.flagged}
+            for a, r in reports.items()}
+    (artifacts_dir / "narration_meta.json").write_text(
+        json.dumps(meta, indent=2), encoding="utf-8")
+
+
 def _narrate_and_deliver(cfg: Config, digest: Digest, artifacts_dir: Path,
                          llm: LLMClient | None, notifier: TelegramNotifier | None) -> None:
+    reports: dict[str, Report] = {}
     for audience, audience_cfg in cfg.audiences.items():
         report = narrate_report(digest, audience, cfg.report.language, llm)
+        reports[audience] = report
         (artifacts_dir / f"report_{audience}.md").write_text(report.text, encoding="utf-8")
-        if report.flagged:
-            typer.echo(f"[fallback] {audience}: LLM output rejected or unavailable; "
-                       "deterministic template used.", err=True)
+        _flag_fallback(audience, report)
         if notifier is None:
             typer.echo(f"\n===== {audience} =====\n{report.text}")
         else:
             chat_id = _require(os.getenv(audience_cfg.chat_id_env),
                                audience_cfg.chat_id_env)
             notifier.send(chat_id, report.text)
+    _write_narration_meta(artifacts_dir, reports)
 
 
 @app.command()
@@ -198,9 +220,13 @@ def narrate_cmd(config: Path = ConfigOpt, artifacts_dir: Path = ArtifactsOpt,
     digest = Digest.model_validate_json(
         (artifacts_dir / "digest.json").read_text(encoding="utf-8"))
     llm = _make_llm(no_llm, Secrets.from_env(), cfg)
+    reports: dict[str, Report] = {}
     for audience in cfg.audiences:
         report = narrate_report(digest, audience, cfg.report.language, llm)
+        reports[audience] = report
         (artifacts_dir / f"report_{audience}.md").write_text(report.text, encoding="utf-8")
+        _flag_fallback(audience, report)
+    _write_narration_meta(artifacts_dir, reports)
 
 
 @app.command()
